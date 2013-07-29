@@ -1,0 +1,46 @@
+definitions:
+
+    imports:
+        - "cloudify.types"
+        - "vagrant-host-provisioner.yaml"
+        - "python-chef-client-installer-AppModule.yaml"
+
+    service_templates:
+        simple_web_server:
+            topology:
+                webserver_host:
+                    type: "cloudify.tosca.types.host"
+                    properties:
+                        install_agent: 'true'
+                        vagrant_file: |
+                            Vagrant.configure("2") do |config|
+                              config.vm.box = "precise32"
+                              config.vm.network :private_network, ip: "10.0.0.5"
+                              config.vm.provision :shell, :inline => "sudo ufw disable"
+                            end
+                        worker_config:
+                            user: 'vagrant'
+                            port: '22'
+                            key: '~/.vagrant.d/insecure_private_key'
+                            broker: 'amqp://guest:guest@10.0.0.1:5672//'
+
+                webserver_appmodule:
+                    type: "cloudify.tosca.types.web_server"
+                    properties:
+                        chef_version: "11.4.4-2"
+                        chef_server_url: "https://x.x.x.x:443"
+                        chef_validator_name: "chef-validator"
+                        chef_environment: "_default"
+                        chef_deploy_runlist: "recipe[cloudify::common], recipe[tomcat]"
+                        chef_undeploy_runlist: "recipe[tomcat::remove]"
+                        chef_start_runlist: ""
+                        chef_stop_runlist: ""
+                        chef_attributes:
+                          tomcat:
+                              java_options: "-Xms256M -Xmx512M -Djava.awt.headless=true"
+                        chef_validation: |
+                              -----BEGIN RSA PRIVATE KEY-----
+                              ...
+                              -----END RSA PRIVATE KEY-----
+                    relationships:
+                        cloudify.tosca.relationships.hosted_on: "webserver_host"
